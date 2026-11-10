@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Впізнай героя. Пуантилізм (Арт-Галерея)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Marck+Script&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .font-art {
+            font-family: 'Marck Script', cursive;
+        }
+
+        /* Золота рамка для картины */
+        .gold-frame {
+            border: 12px solid #d97706;
+            border-image: linear-gradient(to bottom right, #fef08a, #d97706, #78350f, #fef08a) 1;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        /* Анімація для кнопки з помилкою */
+        @keyframes shakeError {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px) rotate(-2deg); }
+            40%, 80% { transform: translateX(10px) rotate(2deg); }
+        }
+        .shake-err {
+            animation: shakeError 0.4s ease-in-out;
+        }
+
+        /* Плавний наплив карток */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+
+        /* Палітра художника для фону */
+        .art-bg {
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(at 10% 10%, rgba(217, 119, 6, 0.15) 0px, transparent 50%),
+                radial-gradient(at 90% 20%, rgba(236, 72, 153, 0.15) 0px, transparent 50%),
+                radial-gradient(at 50% 80%, rgba(14, 165, 233, 0.15) 0px, transparent 50%);
+        }
+    </style>
+</head>
+<body class="art-bg min-h-screen flex flex-col justify-between items-center p-3 sm:p-6 max-w-4xl mx-auto">
+
+    <!-- Canvas для масштабного салюту точок -->
+    <canvas id="fxCanvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
+
+    <!-- ВЕРХНЯ ПАНЕЛЬ: Заголовок + Лічильники -->
+    <header class="w-full flex flex-wrap justify-between items-center gap-3 bg-slate-900/80 backdrop-blur-md rounded-2xl p-4 border border-amber-500/30 shadow-xl">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl sm:text-4xl">🎨</span>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black bg-gradient-to-r from-amber-300 via-pink-400 to-sky-400 bg-clip-text text-transparent">
+                    Галерея Пуантилізму
+                </h1>
+                <p class="text-xs text-amber-200/70">Увесь малюнок складається з тисяч крапок!</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <!-- Таймер/бонус балів -->
+            <div class="flex items-center gap-2 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-sky-500/30">
+                <span class="text-lg">⏳</span>
+                <div class="text-right">
+                    <div class="text-[10px] text-sky-300 font-bold uppercase">Бонус за швидкість</div>
+                    <div id="bonusPoints" class="text-base font-extrabold text-sky-400">+100</div>
+                </div>
+            </div>
+
+            <!-- Загальні рахунок -->
+            <div class="flex items-center gap-2 bg-amber-500/20 px-4 py-1.5 rounded-xl border border-amber-500/50">
+                <span class="text-2xl">⭐</span>
+                <span id="totalScore" class="text-2xl font-black text-amber-300">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ГОЛОВНА АРТ-ЗОНА (Мольберт та Canvas) -->
+    <main class="w-full my-3 flex flex-col items-center gap-4">
+        
+        <!-- Загадка від художника -->
+        <div class="w-full bg-slate-900/90 rounded-2xl p-4 border border-amber-500/30 text-center shadow-lg relative overflow-hidden">
+            <span class="absolute top-2 left-3 text-amber-500/20 text-4xl font-art">“</span>
+            <h2 id="riddleText" class="text-lg sm:text-2xl font-bold text-amber-100 italic px-6">
+                Завантаження художнього шедевру...
+            </h2>
+            <span class="absolute bottom-1 right-3 text-amber-500/20 text-4xl font-art">”</span>
+        </div>
+
+        <!-- Полотно пуантилізму у золотій рамці -->
+        <div class="relative flex flex-col items-center">
+            <div class="gold-frame rounded-lg bg-black relative overflow-hidden flex items-center justify-center shadow-2xl">
+                <!-- Головний Canvas пуантилізму -->
+                <canvas id="artCanvas" width="340" height="340" class="w-[290px] h-[290px] sm:w-[340px] sm:h-[340px] cursor-pointer bg-slate-950"></canvas>
+                
+                <!-- Overlay успіху при вгадуванні -->
+                <div id="successOverlay" class="hidden absolute inset-0 bg-emerald-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center z-20 animate-fade-in">
+                    <span class="text-6xl sm:text-7xl mb-2 animate-bounce">🏆</span>
+                    <h3 id="heroTitle" class="text-3xl sm:text-4xl font-black text-amber-300 mb-1">ШЕДЕВР!</h3>
+                    <p id="rewardInfo" class="text-emerald-200 text-lg font-bold">Вгадано чудово!</p>
+                </div>
+            </div>
+
+            <!-- Прогрес проявляння картини -->
+            <div class="w-full max-w-[340px] mt-2 flex items-center justify-between gap-2 px-1">
+                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700">
+                    <div id="clarityBar" class="bg-gradient-to-r from-sky-500 via-pink-500 to-amber-400 h-full w-0 transition-all duration-300"></div>
+                </div>
+                <button id="addDotsBtn" class="bg-amber-600 hover:bg-amber-500 active:scale-95 text-xs font-bold px-3 py-1 rounded-lg text-amber-950 flex items-center gap-1 shadow-md whitespace-nowrap">
+                    🎨 Додати крапок
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ВАРІАНТИ ВІДПОВІДЕЙ (4 кардинально оформлені картки) -->
+    <footer class="w-full grid grid-cols-2 sm:grid-cols-4 gap-3 my-2">
+        <!-- Кнопки динамічно додаються через JS -->
+    </footer>
+
+    <script>
+        // БАЗА ДАНИХ СКЛАДНИХ ГЕРОЇВ ТА ЇХ ПУАНТИЛІСТИЧНИХ ШАБЛОНІВ
+        const heroesDatabase = [
+            {
+                name: "Сова",
+                emoji: "🦉",
+                riddle: "Мудрий нічний володар лісу з великими сяючими очима.",
+                palette: ['#f59e0b', '#d97706', '#78350f', '#451a03', '#fef08a', '#1e293b'],
+                options: [
+                    { name: "Сова", emoji: "🦉" },
+                    { name: "Орел", emoji: "🦅" },
+                    { name: "Кажан", emoji: "🦇" },
+                    { name: "Сокіл", emoji: "🐦" }
+                ],
+                // Математична генерація точки форми Сови
+                generator: (ctx, width, height, density) => {
+                    const cx = width / 2, cy = height / 2;
+                    for (let i = 0; i < density; i++) {
+                        let x, y, color;
+                        const rand = Math.random();
+
+                        if (rand < 0.35) { // Тіло сови (овал)
+                            const u = Math.random() * Math.PI * 2;
+                            const r = Math.sqrt(Math.random()) * 80;
+                            x = cx + r * Math.cos(u) * 0.8;
+                            y = cy + 20 + r * Math.sin(u) * 1.1;
+                            color = ['#78350f', '#9a3412', '#b45309'][Math.floor(Math.random() * 3)];
+                        } else if (rand < 0.65) { // Голова та "вушка"
+                            const u = Math.random() * Math.PI * 2;
+                            const r = Math.sqrt(Math.random()) * 55;
+                            x = cx + r * Math.cos(u);
+                            y = cy - 40 + r * Math.sin(u) * 0.9;
+                            color = ['#d97706', '#b45309', '#f59e0b'][Math.floor(Math.random() * 3)];
+                        } else if (rand < 0.85) { // Великі очі (дві зони крапок)
+                            const side = Math.random() > 0.5 ? -22 : 22;
+                            const r = Math.sqrt(Math.random()) * 18;
+                            const u = Math.random() * Math.PI * 2;
+                            x = cx + side + r * Math.cos(u);
+                            y = cy - 45 + r * Math.sin(u);
+                            color = r < 7 ? '#0f172a' : (r < 14 ? '#fef08a' : '#f59e0b');
+                        } else { // Дзьоб та тло
+                            x = cx + (Math.random() - 0.5) * 12;
+                            y = cy - 25 + Math.random() * 16;
+                            color = '#ea580c';
+                        }
+                        drawPoint(ctx, x, y, color, Math.random() * 4.5 + 2);
+                    }
+                }
+            },
+            {
+                name: "Лев",
+                emoji: "🦁",
+                riddle: "Цар звірів із пишною золотою гривою та могутнім риком.",
+                palette: ['#fbbf24', '#d97706', '#b45309', '#78350f', '#fef3c7'],
+                options: [
+                    { name: "Тигр", emoji: "🐅" },
+                    { name: "Лев", emoji: "🦁" },
+                    { name: "Гепард", emoji: "🐆" },
+                    { name: "Песик", emoji: "🐶" }
+                ],
+                generator: (ctx, width, height, density) => {
+                    const cx = width / 2, cy = height / 2;
+                    for (let i = 0; i < density; i++) {
+                        let x, y, color;
+                        const rand = Math.random();
+
+                        if (rand < 0.5) { // Велика грива навколо
+                            const angle = Math.random() * Math.PI * 2;
+                            const r = 45 + Math.sqrt(Math.random()) * 65;
+                            x = cx + r * Math.cos(angle);
+                            y = cy - 10 + r * Math.sin(angle);
+                            color = ['#b45309', '#78350f', '#ea580c', '#d97706'][Math.floor(Math.random() * 4)];
+                        } else if (rand < 0.85) { // Мордочка лева
+                            const angle = Math.random() * Math.PI * 2;
+                            const r = Math.sqrt(Math.random()) * 42;
+                            x = cx + r * Math.cos(angle);
+                            y = cy - 5 + r * Math.sin(angle);
+                            color = ['#fbbf24', '#fef3c7', '#f59e0b'][Math.floor(Math.random() * 3)];
+                        } else { // Носик і очі
+                            x = cx + (Math.random() - 0.5) * 20;
+                            y = cy + Math.random() * 15;
+                            color = '#451a03';
+                        }
+                        drawPoint(ctx, x, y, color, Math.random() * 5 + 2);
+                    }
+                }
+            },
+            {
+                name: "Кит",
+                emoji: "🐳",
+                riddle: "Гігант океану, що випускає фонтан води до самих хмар.",
+                palette: ['#0288d1', '#03a9f4', '#38bdf8', '#bae6fd', '#0c4a6e'],
+                options: [
+                    { name: "Акула", emoji: "🦈" },
+                    { name: "Дельфін", emoji: "🐬" },
+                    { name: "Кит", emoji: "🐳" },
+                    { name: "Осмініг", emoji: "🐙" }
+                ],
+                generator: (ctx, width, height, density) => {
+                    const cx = width / 2, cy = height / 2 + 20;
+                    for (let i = 0; i < density; i++) {
+                        let x, y, color;
+                        const rand = Math.random();
+
+                        if (rand < 0.6) { // Тіло кита (овальна форма зі спинкою)
+                            const u = (Math.random() - 0.5) * Math.PI * 1.6;
+                            const r = Math.sqrt(Math.random()) * 85;
+                            x = cx + r * Math.cos(u) * 1.3;
+                            y = cy + r * Math.sin(u) * 0.7;
+                            color = ['#0288d1', '#03a9f4', '#075985', '#0c4a6e'][Math.floor(Math.random() * 4)];
+                        } else if (rand < 0.8) { // Фонтан води вгору
+                            x = cx - 20 + (Math.random() - 0.5) * 35;
+                            y = cy - 50 - Math.random() * 60;
+                            color = ['#bae6fd', '#7dd3fc', '#ffffff'][Math.floor(Math.random() * 3)];
+                        } else { // Животик та очко
+                            x = cx + (Math.random() - 0.5) * 80;
+                            y = cy + 15 + Math.random() * 25;
+                            color = '#e0f2fe';
+                        }
+                        drawPoint(ctx, x, y, color, Math.random() * 4.5 + 2.5);
+                    }
+                }
+            },
+            {
+                name: "Лисичка",
+                emoji: "🦊",
+                riddle: "Хитра руда красуня з пухнастим хвостиком із білим кінчиком.",
+                palette: ['#ea580c', '#f97316', '#fdba74', '#ffffff', '#1e293b'],
+                options: [
+                    { name: "Бичок", emoji: "🐂" },
+                    { name: "Лисичка", emoji: "🦊" },
+                    { name: "Вовчик", emoji: "🐺" },
+                    { name: "Білочка", emoji: "🐿️" }
+                ],
+                generator: (ctx, width, height, density) => {
+                    const cx = width / 2, cy = height / 2;
+                    for (let i = 0; i < density; i++) {
+                        let x, y, color;
+                        const rand = Math.random();
+
+                        if (rand < 0.45) { // Трикутна мордочка
+                            const t = Math.random();
+                            x = cx + (Math.random() - 0.5) * 110 * (1 - t);
+                            y = cy - 40 + t * 90;
+                            color = ['#ea580c', '#f97316', '#c2410c'][Math.floor(Math.random() * 3)];
+                        } else if (rand < 0.7) { // Пухнастий хвіст збоку
+                            const u = Math.random() * Math.PI * 2;
+                            const r = Math.sqrt(Math.random()) * 45;
+                            x = cx + 60 + r * Math.cos(u) * 0.7;
+                            y = cy + 20 + r * Math.sin(u) * 1.2;
+                            color = r > 28 ? '#ffffff' : '#ea580c';
+                        } else if (rand < 0.85) { // Великі лисячі вушка
+                            const side = Math.random() > 0.5 ? -35 : 35;
+                            x = cx + side + (Math.random() - 0.5) * 25;
+                            y = cy - 65 + Math.random() * 35;
+                            color = '#9a3412';
+                        } else { // Біла щочка та чорний носик
+                            x = cx + (Math.random() - 0.5) * 25;
+                            y = cy + 20 + Math.random() * 20;
+                            color = y > cy + 30 ? '#0f172a' : '#ffffff';
+                        }
+                        drawPoint(ctx, x, y, color, Math.random() * 4 + 2);
+                    }
+                }
+            },
+            {
+                name: "Єдиноріг",
+                emoji: "🦄",
+                riddle: "Казковий чарівний коник із сяючим рогом і райдужною гривою.",
+                palette: ['#ec4899', '#a855f7', '#06b6d4', '#fef08a', '#ffffff'],
+                options: [
+                    { name: "Коник", emoji: "🐴" },
+                    { name: "Зебра", emoji: "🦓" },
+                    { name: "Єдиноріг", emoji: "🦄" },
+                    { name: "Олень", emoji: "🦌" }
+                ],
+                generator: (ctx, width, height, density) => {
+                    const cx = width / 2 - 10, cy = height / 2 + 10;
+                    for (let i = 0; i < density; i++) {
+                        let x, y, color;
+                        const rand = Math.random();
+
+                        if (rand < 0.4) { // Білосніжна голова коня
+                            const u = Math.random() * Math.PI * 2;
+                            const r = Math.sqrt(Math.random()) * 55;
+                            x = cx + r * Math.cos(u) * 0.9;
+                            y = cy - 10 + r * Math.sin(u) * 1.1;
+                            color = '#ffffff';
+                        } else if (rand < 0.75) { // Магічний сяючий ріг вгору
+                            const t = Math.random();
+                            x = cx + 15 + (Math.random() - 0.5) * 12 * (1 - t);
+                            y = cy - 50 - t * 65;
+                            color = ['#fef08a', '#facc15', '#ec4899', '#38bdf8'][Math.floor(Math.random() * 4)];
+                        } else { // Райдужна грива
+                            x = cx - 35 + (Math.random() - 0.5) * 30;
+                            y = cy - 40 + Math.random() * 80;
+                            color = ['#ec4899', '#a855f7', '#3b82f6', '#10b981', '#f59e0b'][Math.floor(Math.random() * 5)];
+                        }
+                        drawPoint(ctx, x, y, color, Math.random() * 4.5 + 2);
+                    }
+                }
+            }
+        ];
+
+        // ЗМІННІ СТАНУ ГРИ
+        let currentHeroIndex = 0;
+        let totalScore = 0;
+        let currentDotsDensity = 150; // Початкова (рідка) кількість точок
+        const maxDotsDensity = 1800;   // Повна чіткість
+        let bonusTimer = null;
+        let currentBonus = 100;
+
+        // Елементи Canvas
+        const artCanvas = document.getElementById('artCanvas');
+        const artCtx = artCanvas.getContext('2d');
+
+        const fxCanvas = document.getElementById('fxCanvas');
+        const fxCtx = fxCanvas.getContext('2d');
+
+        // Допоміжна функція малювання пуантилістичної крапки (із м'яким градієнтом)
+        function drawPoint(ctx, x, y, color, radius) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.85; // Накладання крапок у стилі пуантилізму
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // РЕНДЕР КАРТИНИ (ПУАНТИЛІЗМ)
+        function renderPointillismArt() {
+            // Очищення полотна з темним імпресіоністським тлом
+            artCtx.fillStyle = '#090d16';
+            artCtx.fillRect(0, 0, artCanvas.width, artCanvas.height);
+
+            // Малювання кольорових точок фону
+            const hero = heroesDatabase[currentHeroIndex];
+            for (let i = 0; i < 80; i++) {
+                const fx = Math.random() * artCanvas.width;
+                const fy = Math.random() * artCanvas.height;
+                const fColor = hero.palette[i % hero.palette.length];
+                drawPoint(artCtx, fx, fy, fColor, Math.random() * 6 + 1);
+            }
+
+            // Виклик генератора героя з поточною щільністю точок
+            hero.generator(artCtx, artCanvas.width, artCanvas.height, currentDotsDensity);
+
+            // Оновлення прогрес-бару чіткості
+            const progressPercent = Math.min(100, Math.round((currentDotsDensity / maxDotsDensity) * 100));
+            document.getElementById('clarityBar').style.width = `${progressPercent}%`;
+        }
+
+        // ЗАВАНТАЖЕННЯ НОВОГО РАУНДУ
+        function loadRound() {
+            const hero = heroesDatabase[currentHeroIndex];
+
+            // Скинути прогрес точок та таймер
+            currentDotsDensity = 250;
+            currentBonus = 100;
+            document.getElementById('bonusPoints').textContent = `+${currentBonus}`;
+            document.getElementById('riddleText').textContent = hero.riddle;
+            document.getElementById('successOverlay').classList.add('hidden');
+
+            // Намалювати початковий розмитий образ
+            renderPointillismArt();
+
+            // Запустити динамічне виявлення (додавання точок щосекунди)
+            if (bonusTimer) clearInterval(bonusTimer);
+            bonusTimer = setInterval(() => {
+                if (currentDotsDensity < maxDotsDensity) {
+                    currentDotsDensity += 120;
+                    renderPointillismArt();
+                }
+                if (currentBonus > 10) {
+                    currentBonus -= 3;
+                    document.getElementById('bonusPoints').textContent = `+${currentBonus}`;
+                }
+            }, 700);
+
+            // Згенерувати 4 картки варіантів
+            renderOptionButtons(hero);
+        }
+
+        // РЕНДЕР КНОПОК ВАРІАНТІВ ВІДПОВІДІ
+        function renderOptionButtons(currentHero) {
+            const footer = document.querySelector('footer');
+            footer.innerHTML = '';
+
+            const colors = [
+                'from-rose-600 to-pink-700 border-rose-400 hover:border-pink-300',
+                'from-sky-600 to-blue-700 border-sky-400 hover:border-sky-300',
+                'from-amber-600 to-orange-700 border-amber-400 hover:border-amber-300',
+                'from-emerald-600 to-teal-700 border-emerald-400 hover:border-emerald-300'
+            ];
+
+            // Перемішування варіантів відповідей
+            const shuffledOptions = [...currentHero.options].sort(() => Math.random() - 0.5);
+
+            shuffledOptions.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `bg-gradient-to-br ${colors[idx % colors.length]} border-2 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center gap-1 shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer animate-fade-in`;
+                
+                btn.innerHTML = `
+                    <span class="text-4xl sm:text-5xl filter drop-shadow-md">${opt.emoji}</span>
+                    <span class="text-lg sm:text-xl font-extrabold text-white tracking-wide">${opt.name}</span>
+                `;
+
+                btn.onclick = () => handleAnswer(opt.name, btn);
+                footer.appendChild(btn);
+            });
+        }
+
+        // ПЕРЕВІРКА ВІДПОВІДІ
+        function handleAnswer(selectedName, btnElement) {
+            const hero = heroesDatabase[currentHeroIndex];
+
+            if (selectedName === hero.name) {
+                // ПРАВИЛЬНА ВІДПОВІДЬ
+                clearInterval(bonusTimer);
+
+                // Додавання балів
+                totalScore += currentBonus;
+                document.getElementById('totalScore').textContent = totalScore;
+
+                // Намалювати картину в максимальній якості
+                currentDotsDensity = maxDotsDensity;
+                renderPointillismArt();
+
+                // Показати оверлей шедевру
+                document.getElementById('heroTitle').textContent = `${hero.emoji} ${hero.name.toUpperCase()}!`;
+                document.getElementById('rewardInfo').textContent = `Виграно +${currentBonus} балів!`;
+                document.getElementById('successOverlay').classList.remove('hidden');
+
+                // Пуантилістичний вибух точок-салюту
+                launchPointillismConfetti();
+
+                // Перехід до наступного героя через 2.2 секунди
+                setTimeout(() => {
+                    currentHeroIndex = (currentHeroIndex + 1) % heroesDatabase.length;
+                    loadRound();
+                }, 2200);
+
+            } else {
+                // НЕПРАВИЛЬНА ВІДПОВІДЬ (Шейк кнопки)
+                btnElement.classList.add('shake-err');
+                setTimeout(() => btnElement.classList.remove('shake-err'), 400);
+
+                // Легка штрафна збійка бонусу
+                currentBonus = Math.max(10, currentBonus - 15);
+                document.getElementById('bonusPoints').textContent = `+${currentBonus}`;
+            }
+        }
+
+        // КНОПКА "ДОДАТИ КРАПОК" (Прискорення розкриття)
+        document.getElementById('addDotsBtn').onclick = () => {
+            if (currentDotsDensity < maxDotsDensity) {
+                currentDotsDensity += 300;
+                renderPointillismArt();
+            }
+        };
+
+        // КЛІК НА САМУ КАРТИНУ (Інтерактивне додавання мазків)
+        artCanvas.onclick = (e) => {
+            const rect = artCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (artCanvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (artCanvas.height / rect.height);
+
+            const hero = heroesDatabase[currentHeroIndex];
+            for (let i = 0; i < 25; i++) {
+                const rx = x + (Math.random() - 0.5) * 40;
+                const ry = y + (Math.random() - 0.5) * 40;
+                const c = hero.palette[Math.floor(Math.random() * hero.palette.length)];
+                drawPoint(artCtx, rx, ry, c, Math.random() * 5 + 2);
+            }
+        };
+
+        // АНІМОВАНИЙ САЛЮТ ІЗ ТОЧОК ПУАНТИЛІЗМУ
+        let particles = [];
+        function launchPointillismConfetti() {
+            fxCanvas.width = window.innerWidth;
+            fxCanvas.height = window.innerHeight;
+            particles = [];
+
+            const palette = heroesDatabase[currentHeroIndex].palette;
+            for (let i = 0; i < 120; i++) {
+                particles.push({
+                    x: fxCanvas.width / 2,
+                    y: fxCanvas.height / 2,
+                    radius: Math.random() * 8 + 4,
+                    color: palette[Math.floor(Math.random() * palette.length)],
+                    vx: (Math.random() - 0.5) * 18,
+                    vy: (Math.random() - 0.7) * 18,
+                    alpha: 1
+                });
+            }
+            animateFx();
+        }
+
+        function animateFx() {
+            fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+
+            particles.forEach((p, idx) => {
+                fxCtx.beginPath();
+                fxCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                fxCtx.fillStyle = p.color;
+                fxCtx.globalAlpha = p.alpha;
+                fxCtx.fill();
+
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.35; // Гравітація
+                p.alpha -= 0.018;
+
+                if (p.alpha <= 0) particles.splice(idx, 1);
+            });
+
+            if (particles.length > 0) {
+                requestAnimationFrame(animateFx);
+            }
+        }
+
+        // Старт гри при завантаженні
+        window.onload = loadRound;
+    </script>
+</body>
+</html>
